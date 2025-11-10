@@ -1,39 +1,96 @@
+const WEBSOCKET_URL = "wss://ql8to9jft0.execute-api.us-east-1.amazonaws.com/dev";
+const API_URL = "https://4nzr00pnd5.execute-api.us-east-1.amazonaws.com/usuario/crear";
 
-const WS_URL = "wss://ql8to9jft0.execute-api.us-east-1.amazonaws.com/dev"; // 👈 tu endpoint
-const ws = new WebSocket(WS_URL);
+let ws = null;
+let usuario = null;
 
-const mensajesDiv = document.getElementById("mensajes");
 const nombreInput = document.getElementById("nombre");
+const crearBtn = document.getElementById("crearUsuario");
+const chatSection = document.getElementById("chatSection");
+const userSection = document.getElementById("userSection");
+const mensajesDiv = document.getElementById("mensajes");
 const mensajeInput = document.getElementById("mensaje");
-const enviarBtn = document.getElementById("enviarBtn");
+const enviarBtn = document.getElementById("enviar");
+const estado = document.getElementById("estado");
 
-ws.onopen = () => {
-  console.log("✅ Conectado al WebSocket");
-  const p = document.createElement("p");
-  p.textContent = "Conectado al servidor";
-  mensajesDiv.appendChild(p);
-};
+// ==========================
+// Crear usuario
+// ==========================
+crearBtn.addEventListener("click", async () => {
+  const nombre = nombreInput.value.trim();
+  if (!nombre) {
+    alert("Por favor ingresa un nombre");
+    return;
+  }
 
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  const p = document.createElement("p");
-  p.innerHTML = `<strong>${data.nombre}</strong>: ${data.mensaje}`;
-  mensajesDiv.appendChild(p);
-  mensajesDiv.scrollTop = mensajesDiv.scrollHeight;
-};
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre }),
+    });
 
-ws.onclose = () => {
-  console.log("❌ Desconectado del WebSocket");
-  const p = document.createElement("p");
-  p.textContent = "Desconectado del servidor";
-  mensajesDiv.appendChild(p);
-};
+    const data = await res.json();
+    usuario = data.user;
 
-enviarBtn.onclick = () => {
-  const nombre = nombreInput.value.trim() || "Anónimo";
+    console.log("Usuario creado:", usuario);
+
+    userSection.style.display = "none";
+    chatSection.style.display = "block";
+
+    conectarWebSocket();
+  } catch (error) {
+    console.error("Error al crear usuario:", error);
+    alert("Error creando usuario");
+  }
+});
+
+// ==========================
+// Conectar al WebSocket
+// ==========================
+function conectarWebSocket() {
+  ws = new WebSocket(WEBSOCKET_URL);
+
+  ws.onopen = () => {
+    estado.textContent = "🟢 Conectado al servidor";
+  };
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    mostrarMensaje(data.usuario || "Anónimo", data.mensaje);
+  };
+
+  ws.onclose = () => {
+    estado.textContent = "🔴 Desconectado, reconectando...";
+    setTimeout(conectarWebSocket, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("Error WebSocket:", err);
+  };
+}
+
+// ==========================
+// Enviar mensajes
+// ==========================
+enviarBtn.addEventListener("click", () => {
   const mensaje = mensajeInput.value.trim();
-  if (mensaje === "") return;
+  if (!mensaje || !usuario) return;
 
-  ws.send(JSON.stringify({ nombre, mensaje }));
+  const payload = {
+    action: "sendMessage",
+    mensaje,
+    usuario: usuario.nombre,
+  };
+
+  ws.send(JSON.stringify(payload));
   mensajeInput.value = "";
-};
+});
+
+function mostrarMensaje(user, msg) {
+  const div = document.createElement("div");
+  div.className = "mensaje";
+  div.textContent = `${user}: ${msg}`;
+  mensajesDiv.appendChild(div);
+  mensajesDiv.scrollTop = mensajesDiv.scrollHeight;
+}
