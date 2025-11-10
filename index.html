@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat WebSocket AWS</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #mensajes { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Chat con WebSocket</h2>
+  <input id="nombre" placeholder="Tu nombre" />
+  <br><br>
+  <div id="mensajes"></div>
+  <input id="mensaje" placeholder="Escribe un mensaje" />
+  <button onclick="enviar()">Enviar</button>
+
+  <script>
+    const WS_URL = "wss://<AQUI_TU_ENDPOINT>.execute-api.us-east-1.amazonaws.com/dev";
+
+    const ws = new WebSocket(WS_URL);
+    ws.onopen = () => console.log("Conectado al WebSocket");
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      const div = document.createElement("div");
+      div.textContent = `${data.nombre}: ${data.mensaje}`;
+      document.getElementById("mensajes").appendChild(div);
+    };
+
+    function enviar() {
+      const nombre = document.getElementById("nombre").value;
+      const mensaje = document.getElementById("mensaje").value;
+      ws.send(JSON.stringify({ nombre, mensaje }));
+      document.getElementById("mensaje").value = "";
+    }
+  </script>
+</body>
+</html>
