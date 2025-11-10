@@ -27,11 +27,20 @@ crearBtn.addEventListener("click", async () => {
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre }),
+      body: JSON.stringify({ username: nombre }), // ← Cambié "nombre" por "username"
     });
 
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
     const data = await res.json();
-    usuario = data.user;
+    
+    // ← La respuesta del Lambda es { userId, username }
+    usuario = {
+      userId: data.userId,
+      nombre: data.username
+    };
 
     console.log("Usuario creado:", usuario);
 
@@ -41,7 +50,7 @@ crearBtn.addEventListener("click", async () => {
     conectarWebSocket();
   } catch (error) {
     console.error("Error al crear usuario:", error);
-    alert("Error creando usuario");
+    alert("Error creando usuario. Revisa la consola.");
   }
 });
 
@@ -53,44 +62,65 @@ function conectarWebSocket() {
 
   ws.onopen = () => {
     estado.textContent = "🟢 Conectado al servidor";
+    console.log("WebSocket conectado");
   };
 
   ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    mostrarMensaje(data.usuario || "Anónimo", data.mensaje);
+    console.log("Mensaje recibido:", event.data);
+    try {
+      const data = JSON.parse(event.data);
+      mostrarMensaje(data.usuario || "Anónimo", data.mensaje);
+    } catch (error) {
+      console.error("Error parseando mensaje:", error);
+    }
   };
 
   ws.onclose = () => {
     estado.textContent = "🔴 Desconectado, reconectando...";
+    console.log("WebSocket desconectado");
     setTimeout(conectarWebSocket, 3000);
   };
 
   ws.onerror = (err) => {
     console.error("Error WebSocket:", err);
+    estado.textContent = "❌ Error de conexión";
   };
 }
 
 // ==========================
 // Enviar mensajes
 // ==========================
-enviarBtn.addEventListener("click", () => {
+enviarBtn.addEventListener("click", enviarMensaje);
+
+mensajeInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    enviarMensaje();
+  }
+});
+
+function enviarMensaje() {
   const mensaje = mensajeInput.value.trim();
-  if (!mensaje || !usuario) return;
+  if (!mensaje || !usuario || !ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn("No se puede enviar: ", { mensaje, usuario, wsState: ws?.readyState });
+    return;
+  }
 
   const payload = {
     action: "sendMessage",
     mensaje,
     usuario: usuario.nombre,
+    userId: usuario.userId
   };
 
+  console.log("Enviando mensaje:", payload);
   ws.send(JSON.stringify(payload));
   mensajeInput.value = "";
-});
+}
 
 function mostrarMensaje(user, msg) {
   const div = document.createElement("div");
   div.className = "mensaje";
-  div.textContent = `${user}: ${msg}`;
+  div.innerHTML = `<strong>${user}:</strong> ${msg}`;
   mensajesDiv.appendChild(div);
   mensajesDiv.scrollTop = mensajesDiv.scrollHeight;
 }
