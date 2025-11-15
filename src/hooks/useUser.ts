@@ -33,7 +33,13 @@ export const useUser = (): UseUserReturn => {
     setError(null);
     try {
       const response = await apiService.crearUsuario(nombre);
+      console.log('📦 Respuesta completa de la API:', response);
+      
       const newUser = response.usuario;
+      
+      if (!newUser) {
+        throw new Error('La API no devolvió un usuario válido');
+      }
       
       // Guardar en estado y localStorage
       setUser(newUser);

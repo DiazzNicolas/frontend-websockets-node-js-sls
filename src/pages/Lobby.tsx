@@ -14,10 +14,14 @@ export const Lobby = () => {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 
-  // Redirigir si no hay usuario
+  // Ya no necesitamos validar aquí porque ProtectedRoute lo hace
+  // Pero agregamos un check para TypeScript
   if (!user) {
-    navigate('/');
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl">Cargando...</p>
+      </div>
+    );
   }
 
   const handleCreateRoom = async () => {

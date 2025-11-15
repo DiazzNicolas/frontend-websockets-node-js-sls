@@ -67,14 +67,14 @@ export const useRoomList = (autoRefresh = true, refreshInterval = 5000): UseRoom
 
   // Auto-refresh opcional
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || error) return; // No auto-refresh si hay error
 
     const intervalId = setInterval(() => {
       refreshRooms();
     }, refreshInterval);
 
     return () => clearInterval(intervalId);
-  }, [autoRefresh, refreshInterval, refreshRooms]);
+  }, [autoRefresh, refreshInterval, refreshRooms, error]);
 
   return {
     rooms,

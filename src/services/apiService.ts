@@ -227,17 +227,23 @@ class ApiService {
 
         clearTimeout(timeoutId);
 
-        const data = await response.json();
+        const responseData = await response.json();
 
         if (!response.ok) {
-          throw new ApiError(
-            data.message || `Error ${response.status}`,
-            response.status,
-            data
-          );
+          // Manejar errores del backend
+          const errorMsg = responseData.error?.message || responseData.message || `Error ${response.status}`;
+          throw new ApiError(errorMsg, response.status, responseData);
         }
 
-        return data;
+        // ✅ NUEVO: Desempaquetar respuesta del backend
+        // Backend devuelve: { success: true, data: {...} }
+        // Frontend espera: {...}
+        if (responseData.success && responseData.data) {
+          return responseData.data as T;
+        }
+
+        // Si no tiene esa estructura, devolver tal cual
+        return responseData as T;
       } catch (error) {
         // Si es el último intento o error de cliente (4xx), lanzar error
         if (attempt === retries || (error instanceof ApiError && error.status < 500)) {
@@ -460,9 +466,8 @@ class ApiService {
     return this.request<GetRankingResponse>(`/juego/${sessionId}/ranking`);
   }
 }
-
 // ==========================================
-// WEBSOCKET CLIENT
+// WEBSOCKET CLIENT (CORREGIDO)
 // ==========================================
 
 export interface WebSocketMessage {
@@ -508,7 +513,7 @@ export class WebSocketClient {
         this.ws.onmessage = (event) => {
           try {
             const message: WebSocketMessage = JSON.parse(event.data);
-            console.log('📨 Mensaje recibido:', message.event);
+            console.log('📨 Mensaje recibido:', message.event, message.data);
             this.emit(message.event, message.data);
           } catch (err) {
             console.error('❌ Error al parsear mensaje:', err);
@@ -558,12 +563,35 @@ export class WebSocketClient {
     }
   }
 
-  send(action: string, data: any): void {
+  /**
+   * ✅ CORREGIDO: Enviar mensaje con formato correcto para el backend
+   * 
+   * @param eventType - Tipo de evento (playerJoined, gameStarted, etc.)
+   * @param data - Datos del evento
+   */
+  send(eventType: string, data: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action, data }));
+      const message = {
+        action: 'gameEvent',  // ← Siempre es "gameEvent" para el routing
+        data: {
+          action: eventType,  // ← El tipo de evento real
+          roomId: this.roomId, // ← Siempre incluir roomId
+          ...data             // ← Resto de datos
+        }
+      };
+      
+      console.log('📤 Enviando mensaje:', message);
+      this.ws.send(JSON.stringify(message));
     } else {
       console.error('❌ WebSocket no está conectado');
     }
+  }
+
+  /**
+   * ✅ NUEVO: Método helper para eventos comunes
+   */
+  sendGameEvent(eventType: string, data: any = {}): void {
+    this.send(eventType, data);
   }
 
   on(event: string, callback: (data: any) => void): void {
@@ -610,6 +638,39 @@ export class WebSocketClient {
 }
 
 // ==========================================
+// EJEMPLO DE USO
+// ==========================================
+
+/*
+// Crear cliente
+const wsClient = new WebSocketClient('sala-123', 'usuario-001');
+
+// Conectar
+await wsClient.connect();
+
+// Escuchar eventos
+wsClient.on('playerJoined', (data) => {
+  console.log('Jugador se unió:', data);
+});
+
+wsClient.on('gameStarted', (data) => {
+  console.log('Juego iniciado:', data);
+});
+
+// Enviar eventos
+wsClient.sendGameEvent('chatMessage', {
+  mensaje: '¡Hola a todos! 👋'
+});
+
+wsClient.sendGameEvent('playerAnswered', {
+  respuesta: 'Pizza'
+});
+
+// Desconectar
+wsClient.disconnect();
+*/
+
+// ==========================================
 // SESSION MANAGER
 // ==========================================
 
@@ -623,8 +684,16 @@ export class SessionManager {
   }
 
   static getUser(): User | null {
-    const data = localStorage.getItem(this.USER_KEY);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(this.USER_KEY);
+      if (!data || data === 'undefined' || data === 'null') {
+        return null;
+      }
+      return JSON.parse(data);
+    } catch (err) {
+      console.error('Error al parsear usuario:', err);
+      return null;
+    }
   }
 
   static clearUser(): void {
@@ -636,8 +705,16 @@ export class SessionManager {
   }
 
   static getRoom(): Room | null {
-    const data = localStorage.getItem(this.ROOM_KEY);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(this.ROOM_KEY);
+      if (!data || data === 'undefined' || data === 'null') {
+        return null;
+      }
+      return JSON.parse(data);
+    } catch (err) {
+      console.error('Error al parsear sala:', err);
+      return null;
+    }
   }
 
   static clearRoom(): void {
@@ -649,7 +726,11 @@ export class SessionManager {
   }
 
   static getSession(): string | null {
-    return localStorage.getItem(this.SESSION_KEY);
+    const data = localStorage.getItem(this.SESSION_KEY);
+    if (!data || data === 'undefined' || data === 'null') {
+      return null;
+    }
+    return data;
   }
 
   static clearSession(): void {
@@ -662,7 +743,6 @@ export class SessionManager {
     this.clearSession();
   }
 }
-
 // ==========================================
 // EXPORTAR INSTANCIA
 // ==========================================

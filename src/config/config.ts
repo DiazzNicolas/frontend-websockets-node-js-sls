@@ -2,8 +2,8 @@
 
 export const API_CONFIG = {
   // URLs de la API
-  BASE_URL: import.meta.env.VITE_API_URL || 'https://your-api-id.execute-api.us-east-1.amazonaws.com/dev',
-  WS_URL: import.meta.env.VITE_WS_URL || 'wss://your-api-id.execute-api.us-east-1.amazonaws.com/dev',
+  BASE_URL: 'https://3d8ozhwft5.execute-api.us-east-1.amazonaws.com',
+  WS_URL: 'wss://gkli4cpic5.execute-api.us-east-1.amazonaws.com/dev',
   
   // Timeouts y reintentos
   TIMEOUT: 30000, // 30 segundos

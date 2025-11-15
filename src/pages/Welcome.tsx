@@ -19,7 +19,10 @@ export const Welcome = () => {
 
     try {
       await createUser(nombre.trim());
-      navigate('/lobby');
+      // Esperar un poquito para que el estado se actualice
+      setTimeout(() => {
+        navigate('/lobby');
+      }, 100);
     } catch (err) {
       console.error('Error al crear usuario:', err);
     }
